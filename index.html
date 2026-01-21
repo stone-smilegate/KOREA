@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KOREA</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0b0b0b;
+      color: #f5f5f5;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    #stage {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      perspective: 1400px;
+    }
+
+    #text {
+      position: relative;
+      width: 1000px;
+      transform-style: preserve-3d;
+    }
+
+    .char {
+      position: absolute;
+      white-space: pre;
+      will-change: transform, opacity;
+    }
+  </style>
+</head>
+<body>
+<div id="stage">
+  <div id="text"></div>
+</div>
+
+<script>
+"use strict";
+
+/* CONFIG */
+var RETURN_FORCE = 0.05;
+var DAMPING = 0.88;
+var REPULSE_RADIUS = 150;
+var REPULSE_FORCE = 0.7;
+
+var CYLINDER_RADIUS = 260;
+
+// rotation state
+var rotY = 0;              // cylinder rotation (auto)
+var rotSpeed = -0.002;     // vertical scroll speed
+
+// camera tilt (view)
+var camTilt = 0;           // left / right view tilt     // default direction = reversed
+
+/* TEXT */
+var LYRICS = [
+  "DONGHAEMULGWA BAEKDUSANI MAREUGO DALDOROK",
+  "HANANEUNIMI BOUHASAE URINARA MANSE",
+  "MUGUNGHWA SAMCHEONRI HWARYEO GANGSAN",
+  "DAEHAN SARAM DAEHANEURO GIRI BOJEONHASE",
+  "NAMSAN WIUI JEO SONAMU CHEOLGAPEUL DUREUN DEUT",
+  "BARAM SEORI BULBYEONHAMEUN URI GISANGILSE",
+  "MUGUNGHWA SAMCHEONRI HWARYEO GANGSAN",
+  "DAEHAN SARAM DAEHANEURO GIRI BOJEONHASE",
+  "GAEUL HANEUL GONGHWALHANDE NOPGO GUREUM EOPSI",
+  "BALGEUN DALEUN URI GASEUM ILPYEONDANSIMILSE",
+  "MUGUNGHWA SAMCHEONRI HWARYEO GANGSAN",
+  "DAEHAN SARAM DAEHANEURO GIRI BOJEONHASE",
+  "I GISANGWA I MAMEURO CHUNGSEONGEUL DAHAYEO",
+  "GOEROUNA JEULGEOUNA NARA SARANGHASE",
+  "MUGUNGHWA SAMCHEONRI HWARYEO GANGSAN",
+  "DAEHAN SARAM DAEHANEURO GIRI BOJEONHASE"
+];
+
+var textEl = document.getElementById("text");
+var chars = [];
+var mouse = { x: -9999, y: -9999 };
+
+function buildText() {
+  textEl.innerHTML = "";
+  chars.length = 0;
+
+  var lineHeight = 26; // tighter
+  var charIndex = 0;
+
+  LYRICS.forEach(function (line, row) {
+    var spans = [];
+    var lineWidth = 0;
+
+    for (var i = 0; i < line.length; i++) {
+      var span = document.createElement("span");
+      span.className = "char";
+      span.textContent = line[i];
+      textEl.appendChild(span);
+      spans.push(span);
+      lineWidth += span.getBoundingClientRect().width || 12;
+    }
+
+    var cursorX = -lineWidth / 2;
+
+    spans.forEach(function (span) {
+      var w = span.getBoundingClientRect().width || 12;
+      chars.push({
+        el: span,
+        index: charIndex++,
+        baseX: cursorX,
+        baseY: row * lineHeight,
+        x: 0, y: 0, vx: 0, vy: 0
+      });
+      cursorX += w;
+    });
+  });
+}
+
+/* INPUT = SENSOR PROXY */
+window.addEventListener("mousemove", function (e) {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+});
+
+window.addEventListener("keydown", function (e) {
+  if (e.key === "ArrowLeft") camTilt -= 0.05;
+  if (e.key === "ArrowRight") camTilt += 0.05;
+  if (e.key === "ArrowUp") rotSpeed -= 0.0015;
+  if (e.key === "ArrowDown") rotSpeed += 0.0015;
+});
+
+function update() {
+  rotY += rotSpeed;
+
+  var totalHeight = LYRICS.length * 26;
+
+  chars.forEach(function (c) {
+    // cylindrical wrap (continuous loop)
+    var wrappedY = ((c.baseY + rotY * 500) % totalHeight + totalHeight) % totalHeight;
+    var theta = (wrappedY / totalHeight) * Math.PI * 2;
+
+    var z = Math.cos(theta) * CYLINDER_RADIUS;
+    var y = Math.sin(theta) * CYLINDER_RADIUS;
+
+    var targetX = c.baseX;
+    var targetY = y;
+
+    // anti-gravity repulsion
+    var rect = c.el.getBoundingClientRect();
+    var cx = rect.left + rect.width / 2;
+    var cy = rect.top + rect.height / 2;
+    var dx = cx - mouse.x;
+    var dy = cy - mouse.y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist > 0 && dist < REPULSE_RADIUS) {
+      var f = (1 - dist / REPULSE_RADIUS) * REPULSE_FORCE;
+      c.vx += (dx / dist) * f;
+      c.vy += (dy / dist) * f;
+    }
+
+    c.vx += (targetX - c.x) * RETURN_FORCE;
+    c.vy += (targetY - c.y) * RETURN_FORCE;
+
+    c.vx *= DAMPING;
+    c.vy *= DAMPING;
+
+    c.x += c.vx;
+    c.y += c.vy;
+
+    var depthNorm = (z + CYLINDER_RADIUS) / (2 * CYLINDER_RADIUS);
+    var scale = 0.45 + depthNorm * 0.55;
+    var opacity = 0.08 + depthNorm * 0.92;
+
+    c.el.style.transform =
+      "translate3d(" + c.x + "px, " + c.y + "px, " + z + "px) rotateY(" + camTilt + "rad) scale(" + scale + ")";
+    c.el.style.opacity = opacity;
+  });
+
+  requestAnimationFrame(update);
+}
+
+buildText();
+requestAnimationFrame(update);
+
+/* TESTS */
+console.assert(chars.length > 0, "Characters should exist");
+console.assert(typeof update === "function", "Update loop exists");
+</script>
+</body>
+</html>
