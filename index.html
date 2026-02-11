@@ -3,48 +3,34 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>aaaaa</title>
-
+  <title>ex</title>
   <style>
     html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #0b0b0b;
-      color: #f5f5f5;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont,
-        "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      overflow: hidden; background: #0b0b0b; color: #f5f5f5;
+      font-family: 'Courier New', Courier, monospace;
     }
 
     #stage {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      position: relative; width: 100vw; height: 100vh;
+      display: flex; align-items: center; justify-content: center;
       perspective: 1400px;
     }
 
-    /* ✅ 월드 원점 */
     #text {
-      position: absolute;
-      width: 0;
-      height: 0;
+      position: absolute; width: 0; height: 0;
       transform-style: preserve-3d;
     }
 
     .char {
       position: absolute;
       white-space: pre;
+      display: inline-block;
       will-change: transform, opacity;
-      transform-origin: center;
+      word-break: keep-all; 
     }
   </style>
 </head>
-
 <body>
   <div id="stage">
     <div id="text"></div>
@@ -53,137 +39,107 @@
 <script>
 "use strict";
 
-/* ================= CONFIG ================= */
-
-const RETURN_FORCE   = 0.05;
-const DAMPING        = 0.88;
+const RETURN_FORCE = 0.05;
+const DAMPING = 0.88;
 const REPULSE_RADIUS = 150;
-const REPULSE_FORCE  = 0.7;
-
-const CYLINDER_RADIUS = 280;
+const REPULSE_FORCE = 0.7;
+const CYLINDER_RADIUS = 350; // 이름이 많아져서 반지름을 살짝 키웠습니다.
 
 let rotY = 0;
-let rotSpeed = -0.002;
+let rotSpeed = -0.0015; // 더 우아하게 회전하도록 속도 조절
 let camTilt = 0;
 
-/* ================= TEXT ================= */
-
+/* 각 줄에 약 20명씩, 기존보다 2배 늘린 리스트 */
 const LYRICS = [
-  "Kim Minjun     Lee Seojun     Park Jihoo     Choi Dohyun     Jung Yejun     Kang Siwoo     Yoon Jinho     Jang Hyunwoo     Lim Junsu     Kim Minjun     Lee Seojun     Park Jihoo     Choi Dohyun     Jung Yejun     Kang Siwoo     Yoon Jinho     Jang Hyunwoo     Lim Junsu     Han Sangwook",
-  "Kwon Daniel     Shin Minsoo     Ahn Jaehyun     Hwang Sunwoo     Song Minho     Jeon Jungkook     Hong Gildong     Yoo Taeyang     Baek Seungwon     Kwon Daniel     Shin Minsoo     Ahn Jaehyun     Hwang Sunwoo     Song Minho     Jeon Jungkook     Hong Gildong     Yoo Taeyang     Baek Seungwon     Cho Yujin",
-  "Moon Yerim     Yang Jiwon     Son Heungmin     Suh Dahye     Heo Youngjae     Ko Minji     No Seungho     Na Kyungsoo     Koo Bonhyuk     Moon Yerim     Yang Jiwon     Son Heungmin     Suh Dahye     Heo Youngjae     Ko Minji     No Seungho     Na Kyungsoo     Koo Bonhyuk     Gwak Jinsung",
-  "Cha Eunwoo     Ryu Hyunjin     Sim Sangmin     Min Yoongi     Um Taewoong     Won Bin     Chun Woosung     Pyo Jiwon     Geum Nara     Moon Yerim     Yang Jiwon     Son Heungmin     Suh Dahye     Heo Youngjae     Ko Minji     No Seungho     Na Kyungsoo     Koo Bonhyuk     Ji Changwook",
-  "Kim Hana     Lee Sanghyuk     Park Boyoung     Choi Wooshik     Jung Haein     Kang Haemin     Yoon Sarang     Jang Donggun     Lim Nayoung     Moon Yerim     Yang Jiwon     Son Heungmin     Suh Dahye     Heo Youngjae     Ko Minji     No Seungho     Na Kyungsoo     Koo Bonhyuk     Han Jimin",
-  "Kwon Sora     Shin Dongwook     Ahn Yujin     Hwang Inyeop     Song Kang     Jeon Somi     Hong Soojin     Yoo Jaeasuk     Baek Hyun     Moon Yerim     Yang Jiwon     Son Heungmin     Suh Dahye     Heo Youngjae     Ko Minji     No Seungho     Na Kyungsoo     Koo Bonhyuk     Cho Seungho",
-  "Moon Dongmin     Yang Heejin     Son Yerim     Suh Joonki     Heo Solji     Ko Ara     No Minwoo     Na Yeong     Koo Hara     Moon Yerim     Yang Jiwon     Son Heungmin     Suh Dahye     Heo Youngjae     Ko Minji     No Seungho     Na Kyungsoo     Koo Bonhyuk     Gwak Doowon",
-  "Cha Seungwon     Ryu Junyeol     Sim Eunkyung     Min Kyunghoon     Um Jiwon     Won Jung     Chun Boram     Pyo Minho     Geum Jandi     Moon Yerim     Yang Jiwon     Son Heungmin     Suh Dahye     Heo Youngjae     Ko Minji     No Seungho     Na Kyungsoo     Koo Bonhyuk     Ji Sooyun",
-  "Kim Taehyung     Lee Younghee     Park Chanyeol     Choi Minho     Jung Kook     Kang Daniel     Yoon Bomi     Jang Nara     Lim Siwan     Moon Yerim     Yang Jiwon     Son Heungmin     Suh Dahye     Heo Youngjae     Ko Minji     No Seungho     Na Kyungsoo     Koo Bonhyuk     Han Gain",
-  "Kwon Yuri     Shin Ryujin     Ahn Joongki     Hwang Jungum     Song Hyekyo     Jeon Jihyun     Hong Seokcheon     Yoo Yeonseok     Baek Jiyoung     Moon Yerim     Yang Jiwon     Son Heungmin     Suh Dahye     Heo Youngjae     Ko Minji     No Seungho     Na Kyungsoo     Koo Bonhyuk     Cho Kyuhyun",
-  "Moon Geunyoung     Yang Sechan     Son Naeun     Suh Kangjoon     Heo Joon     Ko Jiyoung     No Hongchul     Na Hoon     Koo Junhoe     Moon Yerim     Yang Jiwon     Son Heungmin     Suh Dahye     Heo Youngjae     Ko Minji     No Seungho     Na Kyungsoo     Koo Bonhyuk     Gwak Minjung",
-  "Cha Taehyun     Ryu Sooyoung     Sim Hyungtak     Min Hyoorin     Um Jungwa     Won Soojin     Chun Myung     Pyo Yejin     Geum Taek     Moon Yerim     Yang Jiwon     Son Heungmin     Suh Dahye     Heo Youngjae     Ko Minji     No Seungho     Na Kyungsoo     Koo Bonhyuk     Ji Sung",
-  "Kim Jisoo     Lee Dahee     Park Seojoon     Choi Siwon     Jung Woosung     Kang Dongwon     Yoon Kyunsang     Jang Hyuk     Lim Yuri     Moon Yerim     Yang Jiwon     Son Heungmin     Suh Dahye     Heo Youngjae     Ko Minji     No Seungho     Na Kyungsoo     Koo Bonhyuk     Han Hyojoo",
-  "Kwon Sangwoo     Shin Seunghun     Ahn Sungki     Hwang Minhyun     Song Joongki     Jeon Dooyun     Hong Bin     Yoo Jitae     Baek Jongwon     Moon Yerim     Yang Jiwon     Son Heungmin     Suh Dahye     Heo Youngjae     Ko Minji     No Seungho     Na Kyungsoo     Koo Bonhyuk     Cho Minho",
-  "Moon Heejun     Yang Yoseob     Son Dongwoon     Suh Jisub     Heo Gayoon     Ko Sooyoung     No Eul     Na Eun     Koo Kyunghwa     Moon Yerim     Yang Jiwon     Son Heungmin     Suh Dahye     Heo Youngjae     Ko Minji     No Seungho     Na Kyungsoo     Koo Bonhyuk     Gwak Jihyuk",
-  "Cha Yeun     Ryu Seungryong     Sim Sooyoung     Min Jihyun     Um Kiyong     Won Miyeon     Chun Inkwon     Pyo Changwon     Geum Ryung     Moon Yerim     Yang Jiwon     Son Heungmin     Suh Dahye     Heo Youngjae     Ko Minji     No Seungho     Na Kyungsoo     Koo Bonhyuk     Ji Min"
+  "Kim Minjun     Lee Seojun     Park Jihoo     Choi Dohyun     Jung Yejun     Kang Siwoo     Yoon Jinho     Jang Hyunwoo     Lim Junsu     Han Sangwook     Kwon Daniel     Shin Minsoo     Ahn Jaehyun     Hwang Sunwoo     Song Minho     Jeon Jungkook     Hong Gildong     Yoo Taeyang     Baek Seungwon     Cho Yujin",
+  "Moon Yerim     Yang Jiwon     Son Heungmin     Suh Dahye     Heo Youngjae     Ko Minji     No Seungho     Na Kyungsoo     Koo Bonhyuk     Gwak Jinsung     Cha Eunwoo     Ryu Hyunjin     Sim Sangmin     Min Yoongi     Um Taewoong     Won Bin     Chun Woosung     Pyo Jiwon     Geum Nara     Ji Changwook",
+  "Kim Hana     Lee Sanghyuk     Park Boyoung     Choi Wooshik     Jung Haein     Kang Haemin     Yoon Sarang     Jang Donggun     Lim Nayoung     Han Jimin     Kwon Sora     Shin Dongwook     Ahn Yujin     Hwang Inyeop     Song Kang     Jeon Somi     Hong Soojin     Yoo Jaeasuk     Baek Hyun     Cho Seungho",
+  "Moon Dongmin     Yang Heejin     Son Yerim     Suh Joonki     Heo Solji     Ko Ara     No Minwoo     Na Yeong     Koo Hara     Gwak Doowon     Cha Seungwon     Ryu Junyeol     Sim Eunkyung     Min Kyunghoon     Um Jiwon     Won Jung     Chun Boram     Pyo Minho     Geum Jandi     Ji Sooyun",
+  "Kim Taehyung     Lee Younghee     Park Chanyeol     Choi Minho     Jung Kook     Kang Daniel     Yoon Bomi     Jang Nara     Lim Siwan     Han Gain     Kwon Yuri     Shin Ryujin     Ahn Joongki     Hwang Jungum     Song Hyekyo     Jeon Jihyun     Hong Seokcheon     Yoo Yeonseok     Baek Jiyoung     Cho Kyuhyun",
+  "Moon Geunyoung     Yang Sechan     Son Naeun     Suh Kangjoon     Heo Joon     Ko Jiyoung     No Hongchul     Na Hoon     Koo Junhoe     Gwak Minjung     Cha Taehyun     Ryu Sooyoung     Sim Hyungtak     Min Hyoorin     Um Jungwa     Won Soojin     Chun Myung     Pyo Yejin     Geum Taek     Ji Sung",
+  "Kim Jisoo     Lee Dahee     Park Seojoon     Choi Siwon     Jung Woosung     Kang Dongwon     Yoon Kyunsang     Jang Hyuk     Lim Yuri     Han Hyojoo     Kwon Sangwoo     Shin Seunghun     Ahn Sungki     Hwang Minhyun     Song Joongki     Jeon Dooyun     Hong Bin     Yoo Jitae     Baek Jongwon     Cho Minho",
+  "Moon Heejun     Yang Yoseob     Son Dongwoon     Suh Jisub     Heo Gayoon     Ko Sooyoung     No Eul     Na Eun     Koo Kyunghwa     Gwak Jihyuk     Cha Yeun     Ryu Seungryong     Sim Sooyoung     Min Jihyun     Um Kiyong     Won Miyeon     Chun Inkwon     Pyo Changwon     Geum Ryung     Ji Min",
+  "Kim Minjun     Lee Seojun     Park Jihoo     Choi Dohyun     Jung Yejun     Kang Siwoo     Yoon Jinho     Jang Hyunwoo     Lim Junsu     Han Sangwook     Kwon Daniel     Shin Minsoo     Ahn Jaehyun     Hwang Sunwoo     Song Minho     Jeon Jungkook     Hong Gildong     Yoo Taeyang     Baek Seungwon     Cho Yujin",
+  "Moon Yerim     Yang Jiwon     Son Heungmin     Suh Dahye     Heo Youngjae     Ko Minji     No Seungho     Na Kyungsoo     Koo Bonhyuk     Gwak Jinsung     Cha Eunwoo     Ryu Hyunjin     Sim Sangmin     Min Yoongi     Um Taewoong     Won Bin     Chun Woosung     Pyo Jiwon     Geum Nara     Ji Changwook",
+  "Kim Hana     Lee Sanghyuk     Park Boyoung     Choi Wooshik     Jung Haein     Kang Haemin     Yoon Sarang     Jang Donggun     Lim Nayoung     Han Jimin     Kwon Sora     Shin Dongwook     Ahn Yujin     Hwang Inyeop     Song Kang     Jeon Somi     Hong Soojin     Yoo Jaeasuk     Baek Hyun     Cho Seungho",
+  "Moon Dongmin     Yang Heejin     Son Yerim     Suh Joonki     Heo Solji     Ko Ara     No Minwoo     Na Yeong     Koo Hara     Gwak Doowon     Cha Seungwon     Ryu Junyeol     Sim Eunkyung     Min Kyunghoon     Um Jiwon     Won Jung     Chun Boram     Pyo Minho     Geum Jandi     Ji Sooyun",
+  "Kim Taehyung     Lee Younghee     Park Chanyeol     Choi Minho     Jung Kook     Kang Daniel     Yoon Bomi     Jang Nara     Lim Siwan     Han Gain     Kwon Yuri     Shin Ryujin     Ahn Joongki     Hwang Jungum     Song Hyekyo     Jeon Jihyun     Hong Seokcheon     Yoo Yeonseok     Baek Jiyoung     Cho Kyuhyun",
+  "Moon Geunyoung     Yang Sechan     Son Naeun     Suh Kangjoon     Heo Joon     Ko Jiyoung     No Hongchul     Na Hoon     Koo Junhoe     Gwak Minjung     Cha Taehyun     Ryu Sooyoung     Sim Hyungtak     Min Hyoorin     Um Jungwa     Won Soojin     Chun Myung     Pyo Yejin     Geum Taek     Ji Sung",
+  "Kim Jisoo     Lee Dahee     Park Seojoon     Choi Siwon     Jung Woosung     Kang Dongwon     Yoon Kyunsang     Jang Hyuk     Lim Yuri     Han Hyojoo     Kwon Sangwoo     Shin Seunghun     Ahn Sungki     Hwang Minhyun     Song Joongki     Jeon Dooyun     Hong Bin     Yoo Jitae     Baek Jongwon     Cho Minho",
+  "Moon Heejun     Yang Yoseob     Son Dongwoon     Suh Jisub     Heo Gayoon     Ko Sooyoung     No Eul     Na Eun     Koo Kyunghwa     Gwak Jihyuk     Cha Yeun     Ryu Seungryong     Sim Sooyoung     Min Jihyun     Um Kiyong     Won Miyeon     Chun Inkwon     Pyo Changwon     Geum Ryung     Ji Min"
 ];
-
-/* ================= STATE ================= */
 
 const textEl = document.getElementById("text");
 const chars = [];
 const mouse = { x: 9999, y: 9999 };
 
-/* ================= BUILD ================= */
-
 function buildText() {
   textEl.innerHTML = "";
   chars.length = 0;
-
-  const lineHeight = 26;
+  const lineHeight = 30;
   let charIndex = 0;
 
   LYRICS.forEach((line, row) => {
-    let temp = [];
+    let tempSpans = [];
     let lineWidth = 0;
 
-    // 실측 (1회)
     for (let i = 0; i < line.length; i++) {
       const span = document.createElement("span");
       span.className = "char";
       span.textContent = line[i];
       textEl.appendChild(span);
 
-      const w = span.offsetWidth || 12;
-      temp.push({ el: span, w });
+      const w = span.getBoundingClientRect().width || 10;
+      tempSpans.push({ el: span, w });
       lineWidth += w;
     }
 
     let cursorX = -lineWidth / 2;
 
-    temp.forEach(obj => {
+    tempSpans.forEach(obj => {
       chars.push({
         el: obj.el,
         index: charIndex++,
         baseX: cursorX,
         baseY: row * lineHeight,
-
         x: cursorX,
         y: 0,
         vx: 0,
         vy: 0
       });
-
       cursorX += obj.w;
     });
   });
 }
-
-/* ================= INPUT ================= */
 
 window.addEventListener("mousemove", e => {
   mouse.x = e.clientX - window.innerWidth / 2;
   mouse.y = e.clientY - window.innerHeight / 2;
 });
 
-window.addEventListener("keydown", e => {
-  if (e.key === "ArrowLeft")  camTilt -= 0.05;
-  if (e.key === "ArrowRight") camTilt += 0.05;
-  if (e.key === "ArrowUp")    rotSpeed -= 0.0015;
-  if (e.key === "ArrowDown")  rotSpeed += 0.0015;
-});
-
-/* ================= LOOP ================= */
-
 function update() {
   rotY += rotSpeed;
-
-  const totalHeight = LYRICS.length * 26;
+  const totalHeight = LYRICS.length * 30;
 
   chars.forEach(c => {
-    const wrappedY =
-      ((c.baseY + rotY * 500) % totalHeight + totalHeight) % totalHeight;
-
+    const wrappedY = ((c.baseY + rotY * 1000) % totalHeight + totalHeight) % totalHeight;
     const theta = (wrappedY / totalHeight) * Math.PI * 2;
 
     const z = Math.cos(theta) * CYLINDER_RADIUS;
     const y = Math.sin(theta) * CYLINDER_RADIUS;
 
-    const targetX = c.baseX;
-    const targetY = y;
-
-    // repulse (월드 좌표)
     const dx = c.x - mouse.x;
     const dy = c.y - mouse.y;
     const dist = Math.hypot(dx, dy);
 
-    if (dist > 0 && dist < REPULSE_RADIUS) {
+    if (dist < REPULSE_RADIUS) {
       const f = (1 - dist / REPULSE_RADIUS) * REPULSE_FORCE;
       c.vx += (dx / dist) * f;
       c.vy += (dy / dist) * f;
     }
 
-    c.vx += (targetX - c.x) * RETURN_FORCE;
-    c.vy += (targetY - c.y) * RETURN_FORCE;
+    c.vx += (c.baseX - c.x) * RETURN_FORCE;
+    c.vy += (y - c.y) * RETURN_FORCE;
 
     c.vx *= DAMPING;
     c.vy *= DAMPING;
@@ -192,22 +148,15 @@ function update() {
     c.y += c.vy;
 
     const depthNorm = (z + CYLINDER_RADIUS) / (2 * CYLINDER_RADIUS);
-    const scale = 0.45 + depthNorm * 0.55;
-    const opacity = 0.08 + depthNorm * 0.92;
+    const scale = 0.5 + depthNorm * 0.5;
+    const opacity = 0.1 + depthNorm * 0.9;
 
-    c.el.style.transform =
-      `translate3d(${c.x}px, ${c.y}px, ${z}px)
-       rotateY(${camTilt}rad)
-       scale(${scale})`;
-
+    c.el.style.transform = `translate3d(${c.x}px, ${c.y}px, ${z}px) rotateY(${camTilt}rad) scale(${scale})`;
     c.el.style.opacity = opacity;
-    c.el.style.zIndex = Math.floor(z);
   });
 
   requestAnimationFrame(update);
 }
-
-/* ================= START ================= */
 
 buildText();
 requestAnimationFrame(update);
