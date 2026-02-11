@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>KOREA - Centered</title>
+  <title>AAAA</title>
+
   <style>
     html, body {
       margin: 0;
@@ -13,7 +14,8 @@
       overflow: hidden;
       background: #0b0b0b;
       color: #f5f5f5;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
 
     #stage {
@@ -26,46 +28,47 @@
       perspective: 1400px;
     }
 
+    /* ✅ 월드 원점 */
     #text {
-      position: absolute; /* 중앙 고정을 위해 absolute 변경 */
-      width: 0; /* 기준점만 사용 */
+      position: absolute;
+      width: 0;
       height: 0;
       transform-style: preserve-3d;
-      display: flex;
-      align-items: center;
-      justify-content: center;
     }
 
     .char {
       position: absolute;
       white-space: pre;
       will-change: transform, opacity;
-      display: inline-block;
       transform-origin: center;
     }
   </style>
 </head>
+
 <body>
-<div id="stage">
-  <div id="text"></div>
-</div>
+  <div id="stage">
+    <div id="text"></div>
+  </div>
 
 <script>
 "use strict";
 
-/* CONFIG */
-var RETURN_FORCE = 0.05;
-var DAMPING = 0.88;
-var REPULSE_RADIUS = 150;
-var REPULSE_FORCE = 0.7;
-var CYLINDER_RADIUS = 300; // 반지름 약간 조정
+/* ================= CONFIG ================= */
 
-var rotY = 0;
-var rotSpeed = -0.002;
-var camTilt = 0;
+const RETURN_FORCE   = 0.05;
+const DAMPING        = 0.88;
+const REPULSE_RADIUS = 150;
+const REPULSE_FORCE  = 0.7;
 
-/* TEXT */
-var LYRICS = [
+const CYLINDER_RADIUS = 280;
+
+let rotY = 0;
+let rotSpeed = -0.002;
+let camTilt = 0;
+
+/* ================= TEXT ================= */
+
+const LYRICS = [
   "Kim Minjun     Lee Seojun     Park Jihoo     Choi Dohyun     Jung Yejun     Kang Siwoo     Yoon Jinho     Jang Hyunwoo     Lim Junsu     Han Sangwook",
   "Kwon Daniel     Shin Minsoo     Ahn Jaehyun     Hwang Sunwoo     Song Minho     Jeon Jungkook     Hong Gildong     Yoo Taeyang     Baek Seungwon     Cho Yujin",
   "Moon Yerim     Yang Jiwon     Son Heungmin     Suh Dahye     Heo Youngjae     Ko Minji     No Seungho     Na Kyungsoo     Koo Bonhyuk     Gwak Jinsung",
@@ -81,103 +84,130 @@ var LYRICS = [
   "Kim Jisoo     Lee Dahee     Park Seojoon     Choi Siwon     Jung Woosung     Kang Dongwon     Yoon Kyunsang     Jang Hyuk     Lim Yuri     Han Hyojoo",
   "Kwon Sangwoo     Shin Seunghun     Ahn Sungki     Hwang Minhyun     Song Joongki     Jeon Dooyun     Hong Bin     Yoo Jitae     Baek Jongwon     Cho Minho",
   "Moon Heejun     Yang Yoseob     Son Dongwoon     Suh Jisub     Heo Gayoon     Ko Sooyoung     No Eul     Na Eun     Koo Kyunghwa     Gwak Jihyuk",
-  "Cha Yeun     Ryu Seungryong     Sim Sooyoung     Min Jihyun     Um Kiyong     Won Miyeon     Chun Inkwon     Pyo Changwon     Geum Ryung     Ji Min",
+  "Cha Yeun     Ryu Seungryong     Sim Sooyoung     Min Jihyun     Um Kiyong     Won Miyeon     Chun Inkwon     Pyo Changwon     Geum Ryung     Ji Min"
 ];
 
-var textEl = document.getElementById("text");
-var chars = [];
-var mouse = { x: -9999, y: -9999 };
+/* ================= STATE ================= */
+
+const textEl = document.getElementById("text");
+const chars = [];
+const mouse = { x: 9999, y: 9999 };
+
+/* ================= BUILD ================= */
 
 function buildText() {
   textEl.innerHTML = "";
   chars.length = 0;
-  var charIndex = 0;
 
-  LYRICS.forEach(function (line, row) {
-    var rowContainer = document.createElement("div"); // 가상 너비 계산용
-    var tempChars = [];
-    var lineWidth = 0;
+  const lineHeight = 26;
+  let charIndex = 0;
 
-    for (var i = 0; i < line.length; i++) {
-      var span = document.createElement("span");
+  LYRICS.forEach((line, row) => {
+    let temp = [];
+    let lineWidth = 0;
+
+    // 실측 (1회)
+    for (let i = 0; i < line.length; i++) {
+      const span = document.createElement("span");
       span.className = "char";
       span.textContent = line[i];
       textEl.appendChild(span);
-      
-      // 임시 폰트 너비 계산 (기본 10px, 띄어쓰기 대응)
-      var charW = line[i] === " " ? 8 : 11; 
-      lineWidth += charW;
 
-      tempChars.push({ el: span, w: charW });
+      const w = span.offsetWidth || 12;
+      temp.push({ el: span, w });
+      lineWidth += w;
     }
 
-    var cursorX = -lineWidth / 2; // 각 줄의 시작점을 중앙으로 보정
+    let cursorX = -lineWidth / 2;
 
-    tempChars.forEach(function (obj) {
+    temp.forEach(obj => {
       chars.push({
         el: obj.el,
         index: charIndex++,
         baseX: cursorX,
-        baseY: row * 26, 
-        x: cursorX, y: 0, vx: 0, vy: 0
+        baseY: row * lineHeight,
+
+        x: cursorX,
+        y: 0,
+        vx: 0,
+        vy: 0
       });
+
       cursorX += obj.w;
     });
   });
 }
 
-window.addEventListener("mousemove", function (e) {
-  mouse.x = e.clientX;
-  mouse.y = e.clientY;
+/* ================= INPUT ================= */
+
+window.addEventListener("mousemove", e => {
+  mouse.x = e.clientX - window.innerWidth / 2;
+  mouse.y = e.clientY - window.innerHeight / 2;
 });
+
+window.addEventListener("keydown", e => {
+  if (e.key === "ArrowLeft")  camTilt -= 0.05;
+  if (e.key === "ArrowRight") camTilt += 0.05;
+  if (e.key === "ArrowUp")    rotSpeed -= 0.0015;
+  if (e.key === "ArrowDown")  rotSpeed += 0.0015;
+});
+
+/* ================= LOOP ================= */
 
 function update() {
   rotY += rotSpeed;
-  var totalHeight = LYRICS.length * 26;
 
-  chars.forEach(function (c) {
-    var wrappedY = ((c.baseY + rotY * 600) % totalHeight + totalHeight) % totalHeight;
-    var theta = (wrappedY / totalHeight) * Math.PI * 2;
+  const totalHeight = LYRICS.length * 26;
 
-    var z = Math.cos(theta) * CYLINDER_RADIUS;
-    var y = Math.sin(theta) * CYLINDER_RADIUS;
+  chars.forEach(c => {
+    const wrappedY =
+      ((c.baseY + rotY * 500) % totalHeight + totalHeight) % totalHeight;
 
-    var targetX = c.baseX;
-    var targetY = y;
+    const theta = (wrappedY / totalHeight) * Math.PI * 2;
 
-    var rect = c.el.getBoundingClientRect();
-    var cx = rect.left + rect.width / 2;
-    var cy = rect.top + rect.height / 2;
-    var dx = cx - mouse.x;
-    var dy = cy - mouse.y;
-    var dist = Math.sqrt(dx * dx + dy * dy);
+    const z = Math.cos(theta) * CYLINDER_RADIUS;
+    const y = Math.sin(theta) * CYLINDER_RADIUS;
+
+    const targetX = c.baseX;
+    const targetY = y;
+
+    // repulse (월드 좌표)
+    const dx = c.x - mouse.x;
+    const dy = c.y - mouse.y;
+    const dist = Math.hypot(dx, dy);
 
     if (dist > 0 && dist < REPULSE_RADIUS) {
-      var f = (1 - dist / REPULSE_RADIUS) * REPULSE_FORCE;
+      const f = (1 - dist / REPULSE_RADIUS) * REPULSE_FORCE;
       c.vx += (dx / dist) * f;
       c.vy += (dy / dist) * f;
     }
 
     c.vx += (targetX - c.x) * RETURN_FORCE;
     c.vy += (targetY - c.y) * RETURN_FORCE;
+
     c.vx *= DAMPING;
     c.vy *= DAMPING;
+
     c.x += c.vx;
     c.y += c.vy;
 
-    var depthNorm = (z + CYLINDER_RADIUS) / (2 * CYLINDER_RADIUS);
-    var scale = 0.5 + depthNorm * 0.5;
-    var opacity = 0.1 + depthNorm * 0.9;
+    const depthNorm = (z + CYLINDER_RADIUS) / (2 * CYLINDER_RADIUS);
+    const scale = 0.45 + depthNorm * 0.55;
+    const opacity = 0.08 + depthNorm * 0.92;
 
-    // 중앙 정렬을 위해 translate3d 적용
-    c.el.style.transform = 
-      "translate3d(" + c.x + "px, " + c.y + "px, " + z + "px) rotateY(" + camTilt + "rad) scale(" + scale + ")";
+    c.el.style.transform =
+      `translate3d(${c.x}px, ${c.y}px, ${z}px)
+       rotateY(${camTilt}rad)
+       scale(${scale})`;
+
     c.el.style.opacity = opacity;
     c.el.style.zIndex = Math.floor(z);
   });
 
   requestAnimationFrame(update);
 }
+
+/* ================= START ================= */
 
 buildText();
 requestAnimationFrame(update);
