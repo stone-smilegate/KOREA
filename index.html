@@ -3,12 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ex</title>
+  <title>ex2</title>
   <style>
     html, body {
       margin: 0; padding: 0; width: 100%; height: 100%;
       overflow: hidden; background: #0b0b0b; color: #f5f5f5;
-      font-family: 'Courier New', Courier, monospace;
+      /* 원래의 system-ui 폰트로 복구 */
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
 
     #stage {
@@ -25,9 +26,8 @@
     .char {
       position: absolute;
       white-space: pre;
-      display: inline-block;
       will-change: transform, opacity;
-      word-break: keep-all; 
+      transform-origin: center;
     }
   </style>
 </head>
@@ -39,17 +39,18 @@
 <script>
 "use strict";
 
-const RETURN_FORCE = 0.05;
-const DAMPING = 0.88;
+/* ================= CONFIG ================= */
+const RETURN_FORCE   = 0.05;
+const DAMPING        = 0.88;
 const REPULSE_RADIUS = 150;
-const REPULSE_FORCE = 0.7;
-const CYLINDER_RADIUS = 350; // 이름이 많아져서 반지름을 살짝 키웠습니다.
+const REPULSE_FORCE  = 0.7;
+const CYLINDER_RADIUS = 320; 
 
 let rotY = 0;
-let rotSpeed = -0.0015; // 더 우아하게 회전하도록 속도 조절
-let camTilt = 0;
+let rotSpeed = -0.002; // 기본 회전 속도
+let camTilt = 0;      // 기본 기울기
 
-/* 각 줄에 약 20명씩, 기존보다 2배 늘린 리스트 */
+/* ================= TEXT (줄당 20명으로 확장) ================= */
 const LYRICS = [
   "Kim Minjun     Lee Seojun     Park Jihoo     Choi Dohyun     Jung Yejun     Kang Siwoo     Yoon Jinho     Jang Hyunwoo     Lim Junsu     Han Sangwook     Kwon Daniel     Shin Minsoo     Ahn Jaehyun     Hwang Sunwoo     Song Minho     Jeon Jungkook     Hong Gildong     Yoo Taeyang     Baek Seungwon     Cho Yujin",
   "Moon Yerim     Yang Jiwon     Son Heungmin     Suh Dahye     Heo Youngjae     Ko Minji     No Seungho     Na Kyungsoo     Koo Bonhyuk     Gwak Jinsung     Cha Eunwoo     Ryu Hyunjin     Sim Sangmin     Min Yoongi     Um Taewoong     Won Bin     Chun Woosung     Pyo Jiwon     Geum Nara     Ji Changwook",
@@ -73,10 +74,11 @@ const textEl = document.getElementById("text");
 const chars = [];
 const mouse = { x: 9999, y: 9999 };
 
+/* ================= BUILD ================= */
 function buildText() {
   textEl.innerHTML = "";
   chars.length = 0;
-  const lineHeight = 30;
+  const lineHeight = 28;
   let charIndex = 0;
 
   LYRICS.forEach((line, row) => {
@@ -89,7 +91,7 @@ function buildText() {
       span.textContent = line[i];
       textEl.appendChild(span);
 
-      const w = span.getBoundingClientRect().width || 10;
+      const w = span.getBoundingClientRect().width || 11;
       tempSpans.push({ el: span, w });
       lineWidth += w;
     }
@@ -112,14 +114,23 @@ function buildText() {
   });
 }
 
+/* ================= INPUT (복구됨) ================= */
 window.addEventListener("mousemove", e => {
   mouse.x = e.clientX - window.innerWidth / 2;
   mouse.y = e.clientY - window.innerHeight / 2;
 });
 
+window.addEventListener("keydown", e => {
+  if (e.key === "ArrowLeft")  camTilt -= 0.05;
+  if (e.key === "ArrowRight") camTilt += 0.05;
+  if (e.key === "ArrowUp")    rotSpeed -= 0.0015;
+  if (e.key === "ArrowDown")  rotSpeed += 0.0015;
+});
+
+/* ================= LOOP ================= */
 function update() {
   rotY += rotSpeed;
-  const totalHeight = LYRICS.length * 30;
+  const totalHeight = LYRICS.length * 28;
 
   chars.forEach(c => {
     const wrappedY = ((c.baseY + rotY * 1000) % totalHeight + totalHeight) % totalHeight;
@@ -148,11 +159,12 @@ function update() {
     c.y += c.vy;
 
     const depthNorm = (z + CYLINDER_RADIUS) / (2 * CYLINDER_RADIUS);
-    const scale = 0.5 + depthNorm * 0.5;
-    const opacity = 0.1 + depthNorm * 0.9;
+    const scale = 0.45 + depthNorm * 0.55;
+    const opacity = 0.08 + depthNorm * 0.92;
 
     c.el.style.transform = `translate3d(${c.x}px, ${c.y}px, ${z}px) rotateY(${camTilt}rad) scale(${scale})`;
     c.el.style.opacity = opacity;
+    c.el.style.zIndex = Math.floor(z);
   });
 
   requestAnimationFrame(update);
